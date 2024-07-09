@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+if git remote show upstream > /dev/null 2>&1
+then
+  echo "  Warning: upstream remote already exists; replacing..."
+  git remote rm upstream
+fi
+git remote add upstream https://github.com/ornladios/SummerStudents2024.git
+
+echo "Re-configuring local master branch to use upstream"
+git config branch.main.remote upstream
+git config branch.main.mergeOptions "--ff-only"
+git config merge.log 100
+git fetch --all -p
+
+exit 0
