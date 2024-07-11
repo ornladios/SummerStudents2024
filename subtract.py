@@ -1,45 +1,47 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+from adios2 import Adios
 from adios2 import FileReader, Stream
 
+if len(sys.argv) < 8:
 
- 
-
-if len(sys.argv) < 7:
     print(f"Usage: {sys.argv[0]} bpfile funcname Lname bpfile1 funcname1 Lname1")
+
     sys.exit(1)
 
  
-
 fname = sys.argv[1]
 funcname = sys.argv[2]
 Lname = sys.argv[3]
 fname1 = sys.argv[4]
 funcname1 = sys.argv[5]
 Lname1 = sys.argv[6]
+output_file = sys.argv[7]
 
 # some empty lists to store the data
+
 funcdata = []
 Ldata = []
 funcdata1 = []
 Ldata1 = []
 
-
 # Reading data from the first file
+
 with Stream(fname, "r") as f:
-  for _ in f.steps():
-    funcdata.append(f.read(funcname))
-    Ldata.append(f.read(Lname))
+    for _ in f.steps():
+        funcdata.append(f.read(funcname))
+        Ldata.append(f.read(Lname))
 
 # Reading data from the second file
+
 with Stream(fname1, "r") as f:
     for _ in f.steps():
         funcdata1.append(f.read(funcname1))
         Ldata1.append(f.read(Lname1))
 
-
 # Convert lists to numpy arrays
+
 funcdata = np.concatenate(funcdata)
 Ldata = np.concatenate(Ldata)
 funcdata1 = np.concatenate(funcdata1)
