@@ -148,6 +148,18 @@ int main(int argc, char *argv[])
     size_t len_x = atoi(argv[3]); // global length
     size_t len_y = atoi(argv[4]); // global length
     size_t tmax = atoi(argv[5]);
+    if (!(len_z == len_x && len_z == len_y && len_x == len_y))
+    {
+        if (rank == 0)
+        {
+            // Only rank 0 prints the error message to avoid duplication
+            fprintf(stderr, "Error: len_z, len_x, and len_y must be equal to each other.\n");
+        }
+#if ADIOS2_USE_MPI
+        MPI_Abort(MPI_COMM_WORLD, 1); // Abort the program with a non-zero exit code
+#endif
+        return -1;
+    }
 
     int num = atoi(argv[6]); // num is choose function
     // Total number of values in the 2d grid
@@ -219,13 +231,6 @@ int main(int argc, char *argv[])
         bpIO.DefineVariable<double>("F", {len_z, len_x, len_y}, {start_z, 0, 0},
                                     {local_len_z, len_x, len_y}, adios2::ConstantDims);
 
-    /* Defining a variable for the function values
-    // "laplacian" is going to have a global size of (len_z * size) by len_x by len_z
-    // Each process is gonna start writing at index [rank * len_z][0][0] meaning rank * len_z
-    // slice of the 3d grid Each process is gonna write (len_z, len_x, len_y) values*/
-    // adios2::Variable<double> lOut =
-    // bpIO.DefineVariable<double>("L", {len_z, len_x, len_y}, {start_z, 0, 0},
-    // {local_len_z, len_x, len_y}, adios2::ConstantDims);
     adios2::Variable<int> vTime = bpIO.DefineVariable<int>("step");
 
     const std::string extent = "0 " + std::to_string(size * z.size() - 1) + " 0 " +
