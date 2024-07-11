@@ -287,11 +287,11 @@ int main(int argc, char *argv[])
         {
             bpWriter.Put(xOut, x.data()); // writing the x values
             bpWriter.Put(yOut, y.data()); // writing the y values
-            bpWriter.Put(zOut, z.data()); // writing the z values
             bpWriter.Put(tOut, time);     // writing out the time used to calculate F
             bpWriter.Put(stepOut, t);
         }
 
+        bpWriter.Put(zOut, z.data()); // writing the z values
         bpWriter.Put(fOut, F.data()); // this must be written for each rank
 
         if (t == 1)

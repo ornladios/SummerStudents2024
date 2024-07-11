@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from adios2 import Stream
 
 if len(sys.argv) < 6:
-    print(f"Usage: {sys.argv[0]} need correct arguments")
+    print(f"Usage: {sys.argv[0]} python3 error.py fname varname fname1 varname1 step_")
     sys.exit(1)
 
 fname = sys.argv[1]
