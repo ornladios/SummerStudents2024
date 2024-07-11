@@ -28,8 +28,6 @@
 
 #endif
 #define PI 3.141592653589793
-#define xAxis 0
-#define yAxis 1
 using namespace std;
 
 void genCoords(int rank, int size, double start_x, double end_x, std::vector<double> &xvector,
@@ -148,8 +146,21 @@ int main(int argc, char *argv[])
     size_t len_x = atoi(argv[3]); // global length
     size_t len_y = atoi(argv[4]); // global length
     size_t tmax = atoi(argv[5]);
+    if (!(len_z == len_x && len_z == len_y && len_x == len_y))
+    {
+        if (rank == 0)
+        {
+            // Only rank 0 prints the error message to avoid duplication
+            fprintf(stderr, "Error: len_z, len_x, and len_y must be equal to each other.\n");
+        }
+#if ADIOS2_USE_MPI
+        MPI_Abort(MPI_COMM_WORLD, 1); // Abort the program with a non-zero exit code
+#endif
+        return -1;
+    }
 
     int num = atoi(argv[6]); // num is choose function
+
     // Total number of values in the 2d grid
     size_t local_len_z = len_z / size;
     size_t remainder = len_z % size;
@@ -187,11 +198,10 @@ int main(int argc, char *argv[])
 
     // Initialize a double vector of size len_global
     std::vector<double> F(len_local, 0.0); // F is the function we are trying to differentiate
-    // std::vector<double> L(len_local, 0.0); // L is the laplacian of the function
 
     // Creating the adios2 IO object
-    // adios2::IO bpIO = adios.DeclareIO("BPFile_N2N");
     adios2::IO bpIO = adios.DeclareIO("WriteIO");
+
     // Opening <filename> for writing with adios2 bpIO object
     adios2::Engine bpWriter = bpIO.Open(filename, adios2::Mode::Write);
     adios2::Operator op = adios.DefineOperator("mgard", "mgard");
@@ -211,6 +221,9 @@ int main(int argc, char *argv[])
     adios2::Variable<double> tOut = bpIO.DefineVariable<double>("time");
     adios2::Variable<double> deltaTOut = bpIO.DefineVariable<double>("deltaT");
     adios2::Variable<double> hOut = bpIO.DefineVariable<double>("h");
+    adios2::Variable<int> tmaxOut = bpIO.DefineVariable<int>("MaxStep");
+    adios2::Variable<int> stepOut = bpIO.DefineVariable<int>("step");
+
     // Defining a variable for the function values
     // "F" is going to have a global size of (len_z * size) by len_x by len_z
     // Each process is gonna start writing at index [rank * len_z][0][0] meaning rank * len_z
@@ -218,15 +231,6 @@ int main(int argc, char *argv[])
     adios2::Variable<double> fOut =
         bpIO.DefineVariable<double>("F", {len_z, len_x, len_y}, {start_z, 0, 0},
                                     {local_len_z, len_x, len_y}, adios2::ConstantDims);
-
-    /* Defining a variable for the function values
-    // "laplacian" is going to have a global size of (len_z * size) by len_x by len_z
-    // Each process is gonna start writing at index [rank * len_z][0][0] meaning rank * len_z
-    // slice of the 3d grid Each process is gonna write (len_z, len_x, len_y) values*/
-    // adios2::Variable<double> lOut =
-    // bpIO.DefineVariable<double>("L", {len_z, len_x, len_y}, {start_z, 0, 0},
-    // {local_len_z, len_x, len_y}, adios2::ConstantDims);
-    adios2::Variable<int> vTime = bpIO.DefineVariable<int>("step");
 
     const std::string extent = "0 " + std::to_string(size * z.size() - 1) + " 0 " +
                                std::to_string(x.size() - 1) + " 0 " + std::to_string(y.size() - 1);
@@ -272,73 +276,6 @@ int main(int argc, char *argv[])
         // Calculate the function values
         calcF(num, rank, t, x, z, y, F);
 
-        // Declaring vectors for forward and backward neighbors
-        std::vector<double> forward_buffer(len_x * len_y, 0);
-        std::vector<double> backward_buffer(len_x * len_y, 0);
-
-        // Initialize forward/backward neighbors with the values at the first/last slice in our
-        // 3d grid
-        for (int i = 0; i < len_x; i++)
-        {
-            for (int j = 0; j < len_y; j++)
-            {
-                int k = local_len_z - 1;
-                forward_buffer[i * y.size() + j] =
-                    F[k * x.size() * y.size() + i * y.size() + j]; // F[len_z - 1][i][j]
-                backward_buffer[i * y.size() + j] =
-                    F[0 * x.size() * y.size() + i * y.size() + j]; // F[0][i][j]
-            }
-        }
-
-#if ADIOS2_USE_MPI
-        if (size > 1)
-        {
-            // if rank is the front-most (first slice-block)
-            // cout << "MY RANK: " << rank << endl;
-            MPI_Request send_forward_request;
-            MPI_Request send_backward_request;
-            if (rank == 0)
-            {
-                MPI_Status status;
-                // cout << "Sending: " << forward_buffer << endl;
-                std::vector<double> sending_buffer = forward_buffer;
-                MPI_Isend(sending_buffer.data(), len_x * len_y, MPI_DOUBLE, rank + 1, 0,
-                          MPI_COMM_WORLD, &send_forward_request);
-                MPI_Recv(forward_buffer.data(), len_x * len_y, MPI_DOUBLE, rank + 1, 0,
-                         MPI_COMM_WORLD, &status);
-                // cout << "Recieving: " << forward_buffer << endl;
-            }
-            // if rank is the back-most (last slice-block)
-            else if (rank == size - 1)
-            {
-                MPI_Status status;
-                std::vector<double> sending_buffer = backward_buffer;
-                MPI_Isend(sending_buffer.data(), len_x * len_y, MPI_DOUBLE, rank - 1, 0,
-                          MPI_COMM_WORLD, &send_backward_request);
-                MPI_Recv(backward_buffer.data(), len_x * len_y, MPI_DOUBLE, rank - 1, 0,
-                         MPI_COMM_WORLD, &status);
-            }
-            else
-            // if rank is middle
-            {
-                MPI_Status status;
-                std::vector<double> sending_buffer = forward_buffer;
-                std::vector<double> sending_buffer2 = backward_buffer;
-                MPI_Isend(sending_buffer.data(), len_x * len_y, MPI_DOUBLE, rank + 1, 0,
-                          MPI_COMM_WORLD, &send_forward_request);
-                MPI_Isend(sending_buffer2.data(), len_x * len_y, MPI_DOUBLE, rank - 1, 0,
-                          MPI_COMM_WORLD, &send_backward_request);
-                MPI_Recv(forward_buffer.data(), len_x * len_y, MPI_DOUBLE, rank + 1, 0,
-                         MPI_COMM_WORLD, &status);
-                MPI_Recv(backward_buffer.data(), len_x * len_y, MPI_DOUBLE, rank - 1, 0,
-                         MPI_COMM_WORLD, &status);
-            }
-#if ADIOS2_USE_MPI
-            MPI_Barrier(MPI_COMM_WORLD);
-#endif
-        }
-#endif
-
 #if ADIOS2_USE_MPI
         double start = MPI_Wtime();
 #endif
@@ -351,15 +288,17 @@ int main(int argc, char *argv[])
             bpWriter.Put(xOut, x.data()); // writing the x values
             bpWriter.Put(yOut, y.data()); // writing the y values
             bpWriter.Put(zOut, z.data()); // writing the z values
+            bpWriter.Put(tOut, time);     // writing out the time used to calculate F
+            bpWriter.Put(stepOut, t);
         }
-        bpWriter.Put(tOut, time);
-        bpWriter.Put(fOut, F.data()); // writing the F values
 
-        bpWriter.Put(vTime, t);
+        bpWriter.Put(fOut, F.data()); // this must be written for each rank
+
         if (t == 1)
         {
             bpWriter.Put(deltaTOut, dt);
             bpWriter.Put(hOut, h);
+            bpWriter.Put(tmaxOut, (int)tmax);
         }
 
         // End the step
