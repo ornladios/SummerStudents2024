@@ -21,14 +21,16 @@ int main(int argc, char **argv)
         std::cerr << "****************************************************" << std::endl;
         std::cerr << "Error: Usage: " << argv[0] << " input output" << std::endl;
         std::cerr << "  Please rerun with the proper arguments." << std::endl;
-        std::cerr << "  Thanks for stopping by!" << std::endl << std::endl;
+        std::cerr << "  Thanks for stopping by!" << std::endl
+                  << std::endl;
         MPI_Finalize();
         return 0;
     }
     if (numProcs != 1)
     {
         std::cerr << "****************************************************" << std::endl;
-        std::cerr << " Error. This probably only works with 1 rank..." << std::endl << std::endl;
+        std::cerr << " Error. This probably only works with 1 rank..." << std::endl
+                  << std::endl;
         MPI_Finalize();
         return 0;
     }
@@ -64,7 +66,7 @@ int main(int argc, char **argv)
         std::cout << "Reading Step= " << step << std::endl;
         for (const auto &vi : variables)
         {
-            if (vi.first == "step")
+            if (vi.first == "step" || vi.first == "MaxStep")
             {
                 auto var = inIO.InquireVariable<int>(vi.first);
                 if (!var)
