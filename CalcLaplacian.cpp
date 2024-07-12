@@ -15,6 +15,7 @@ using namespace std;
 void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vector<double> &F,
                 std::vector<double> &laplace)
 {
+    // the whole ordering needs to be chnaged
     MPI_Request request;
     MPI_Status status;
     MPI_Request req_send_forward;
@@ -236,10 +237,13 @@ std:
     adios2::IO bpIO = adios.DeclareIO("LaplaceOutput");
     adios2::Engine bpWriter = bpIO.Open(outputFilename, adios2::Mode::Write);
 
-    // Defining the variable lOut
+    // Defining the variable lOut, Maxstep, delta T, x,y,z to write in
     adios2::Variable<double> lOut;
     adios2::Variable<int> StepMaxOut;
     adios2::Variable<double> deltaTOut;
+    adios2::Variable<double> xOut;
+    adios2::Variable<double> yOut;
+    adios2::Variable<double> zOut;
 
     // Defining the variable h
     double h;
@@ -262,7 +266,9 @@ std:
 
         // Inquire the variable F from the input IO
         auto varF = inIO.InquireVariable<double>("F");
-
+        auto varX = inIO.InquireVariable<double>("x");
+        auto varY = inIO.InquireVariable<double>("y");
+        auto varZ = inIO.InquireVariable<double>("z");
         // If it is the first step, get the value of h, since it stays constant
         if (step == 0)
         {
@@ -272,16 +278,35 @@ std:
             reader.Get<double>(varT, &deltaT, adios2::Mode::Sync);
             auto varMaxStep = inIO.InquireVariable<int>("MaxStep");
             reader.Get<int>(varMaxStep, &MaxStep, adios2::Mode::Sync);
+
             std::cout << "Max step: " << MaxStep << endl;
             std::cout << "Delta T: " << deltaT << endl;
         }
 
         // Getting the shape of F (which should in the format of y, x, z) NOTE: change accordingly
         // to coordinate system
+
         auto shapeF = varF.Shape();
-        size_t leny = shapeF[0];
-        size_t lenz = shapeF[1];
-        size_t lenx = shapeF[2];
+        size_t lenx = shapeF[0];
+        size_t leny = shapeF[1]; // y is the size that is changing
+        size_t lenz = shapeF[2];
+
+        auto shapeX = varX.Shape();
+        auto shapeY = varY.Shape();
+        auto shapeZ = varZ.Shape();
+
+        std::vector<double> arrX(lenx, 0.0);
+        std::vector<double> arrY(leny, 0.0);
+        std::vector<double> arrZ(lenz, 0.0);
+
+        varX.SetSelection({{0}, {lenx}});
+        reader.Get<double>(varX, arrX.data(), adios2::Mode::Sync);
+
+        varY.SetSelection({{0}, {leny}});
+        reader.Get<double>(varY, arrY.data(), adios2::Mode::Sync);
+
+        varZ.SetSelection({{0}, {lenz}});
+        reader.Get<double>(varZ, arrZ.data(), adios2::Mode::Sync);
 
         // Calculating the local_len_y and the remainder
         // NOTE: This is assuming that the y dimension is the dimension that is being split!!!
@@ -302,10 +327,13 @@ std:
         // Defining the variable lOut if it is the first step
         if (step == 0)
         {
-            lOut = bpIO.DefineVariable<double>("Laplace", {leny, lenz, lenx}, {start_y, 0, 0},
-                                               {local_len_y, lenz, lenx}, adios2::ConstantDims);
+            lOut = bpIO.DefineVariable<double>("Laplace", {lenx, leny, lenz}, {0, start_y, 0},
+                                               {lenx, local_len_y, lenz}, adios2::ConstantDims);
             StepMaxOut = bpIO.DefineVariable<int>("MaxStep");
             deltaTOut = bpIO.DefineVariable<double>("deltaT");
+            xOut = bpIO.DefineVariable<double>("x", {lenx}, {0}, {lenx}, adios2::ConstantDims);
+            yOut = bpIO.DefineVariable<double>("y", {leny}, {0}, {leny}, adios2::ConstantDims); // weird former changing size
+            zOut = bpIO.DefineVariable<double>("z", {lenz}, {0}, {lenz}, adios2::ConstantDims);
         }
 
         // Creating vectors of size len_local to store the incoming data
@@ -344,6 +372,9 @@ std:
 
         double start = MPI_Wtime();
         bpWriter.Put(lOut, laplace.data());
+        bpWriter.Put(xOut, arrX.data());
+        bpWriter.Put(yOut, arrY.data());
+        bpWriter.Put(zOut, arrZ.data());
         bpWriter.EndStep();
         double stop = MPI_Wtime();
         double mpitime = stop - start;
