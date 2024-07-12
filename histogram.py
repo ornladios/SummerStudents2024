@@ -7,7 +7,7 @@ import adios2.bindings as adios2
 
 # Command-line arguments
 if len(sys.argv) < 5:
-    print("Usage: python3 fname var output_name num_bin")
+    print("Usage: python3 histogram.py inputfile.bp var outputfilename.bp num_bin")
     sys.exit(1)
 
 fname = sys.argv[1]

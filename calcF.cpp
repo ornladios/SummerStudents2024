@@ -123,14 +123,14 @@ int main(int argc, char *argv[])
     adios2::ADIOS adios("./adios2.xml");
 #endif
     // Making sure our user passed in the correct number of arguments
-    // We need 4 arguments: filename, length_z, length_x, length_y, tmax
-    // We check for 5 because argv[0] is always the name of the program
-    if (argc < 5)
+    // We need 6 arguments: filename, length_z, length_x, length_y, tmax
+    // We check for 7 because argv[0] is always the name of the program
+    if (argc < 7)
     {
         if (rank == 0)
         {
             // Only rank 0 prints the error message to avoid duplication
-            fprintf(stderr, "Usage: %s <filename> <length_z> <length_x> <length_y> <tmax>\n",
+            fprintf(stderr, "Usage: %s <filename> <length_z> <length_x> <length_y> <tmax> <num>\n",
                     argv[0]);
         }
 #if ADIOS2_USE_MPI
@@ -287,11 +287,11 @@ int main(int argc, char *argv[])
         {
             bpWriter.Put(xOut, x.data()); // writing the x values
             bpWriter.Put(yOut, y.data()); // writing the y values
-            bpWriter.Put(zOut, z.data()); // writing the z values
             bpWriter.Put(tOut, time);     // writing out the time used to calculate F
             bpWriter.Put(stepOut, t);
         }
 
+        bpWriter.Put(zOut, z.data()); // writing the z values
         bpWriter.Put(fOut, F.data()); // this must be written for each rank
 
         if (t == 1)
