@@ -37,7 +37,8 @@ void genCoords(int rank, int size, double start_x, double end_x, std::vector<dou
     {
         throw std::invalid_argument("start_x must be less than end_x");
     }
-
+    // CHNAGE ALL TO BE THE SAME STEP SIZE H
+    // IF THIS ARE DIFFERENT SIZES THEN I HAVE TO CHANGE
     // z-axis (depth) grows as processor increases -> we need to scale zvector by rank
     double delta_z = (end_x - start_x) / (len_z - 1);
     for (int i = 0; i < zvector.size(); i++)
@@ -141,7 +142,8 @@ int main(int argc, char *argv[])
 
     // Parsing the cmdline arguments into variables
     std::string filename;
-    filename = argv[1];           // name of the .bp file output
+    filename = argv[1]; // name of the .bp file output
+    // CHNAGE ENTER IN X,Y,Z
     size_t len_z = atoi(argv[2]); // global length
     size_t len_x = atoi(argv[3]); // global length
     size_t len_y = atoi(argv[4]); // global length

@@ -16,6 +16,11 @@ void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vecto
                 std::vector<double> &laplace)
 {
     // the whole ordering needs to be chnaged
+    // it starts with nx,ny,nz
+    // I THINK ALL THAT NEEDS TO BE CHNAGED IS NZ TO NY
+    // BUT CHECK!!!!!!!!!!!!!!!!!
+    // L = i+j*nx+k*nx*ny
+    // l = nx*ny
     MPI_Request request;
     MPI_Status status;
     MPI_Request req_send_forward;
@@ -29,22 +34,22 @@ void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vecto
     // ny = rows
     // nx = cols
     // nz = width
-
-    for (int k = 0; k < nz; k++)
+    // THE ABOVE IS OLD LOOK AT THE FIRST COMMENT IN THE METHOD
+    for (int k = 0; k < nz; k++) // loop needs to be changed
     {
         for (int i = 0; i < nx; i++)
         {
-            int j = ny - 1;
+            int j = ny - 1;                   // change to z
             int L = i + nx * k + j * nx * nz; // global movemnent in cube
             int l = i + nx * k;               // local movement in plane
             forward_neighbor[l] = F[L];
         }
     }
-    for (int k = 0; k < nz; k++)
+    for (int k = 0; k < nz; k++) // loop needs to be changed
     {
         for (int i = 0; i < nx; i++)
         {
-            int j = 0;
+            int j = 0;                        // chnage to z
             int L = i + nx * k + j * nx * nz; // global movemnent in cube
             int l = i + nx * k;               // local movement in plane
             backward_neighbor[l] = F[L];
@@ -55,7 +60,7 @@ void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vecto
     if (size > 0)
     {
         if (rank == 0)
-        {
+        { // chnage nx*nz to nx*ny for all
 
             MPI_Isend(sending_bufferF.data(), nx * nz, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD,
                       &req_send_forward);
@@ -84,6 +89,7 @@ void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vecto
     }
     MPI_Barrier(MPI_COMM_WORLD);
     // calculates the laplace equation in the interior FOR ALL OF THEM!!!!!!!!
+    // change order
     for (int j = 1; j < ny - 1; j++) // ny = row index =j
     {
         for (int k = 1; k < nz - 1; k++) // nz = width =k
@@ -105,7 +111,7 @@ void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vecto
     }
     if (rank == 0)
     {
-
+        // change order
         for (int k = 1; k < nz - 1; k++)
         {
             for (int i = 1; i < nx - 1; i++)
@@ -128,7 +134,7 @@ void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vecto
     }
     else if (rank == size - 1) // last proc
     {
-
+        // chnage order
         for (int k = 1; k < nz - 1; k++)
         {
             for (int i = 1; i < nx - 1; i++)
@@ -150,7 +156,7 @@ void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vecto
         }
     }
     else
-    {
+    { // chnage order
         for (int k = 1; k < nz - 1; k++)
         {
             for (int i = 1; i < nx - 1; i++)
@@ -170,7 +176,7 @@ void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vecto
                              (h * h);
             }
         }
-
+        // chang order
         for (int k = 1; k < nz - 1; k++)
         {
             for (int i = 1; i < nx - 1; i++)
