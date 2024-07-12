@@ -284,9 +284,11 @@ std:
             reader.Get<double>(varT, &deltaT, adios2::Mode::Sync);
             auto varMaxStep = inIO.InquireVariable<int>("MaxStep");
             reader.Get<int>(varMaxStep, &MaxStep, adios2::Mode::Sync);
-
-            std::cout << "Max step: " << MaxStep << endl;
-            std::cout << "Delta T: " << deltaT << endl;
+            if (!rank)
+            {
+                std::cout << "Laplace: Max step: " << MaxStep << endl;
+                std::cout << "Laplace: Delta T: " << deltaT << endl;
+            }
         }
 
         // Getting the shape of F (which should in the format of y, x, z) NOTE: change accordingly
@@ -360,13 +362,18 @@ std:
         }
         else
         {
-            std::cout << "Error: This code is designed to run with multiple processors" << std::endl;
+            std::cout << "Laplace: Error: This code is designed to run with multiple processors" << std::endl;
             break;
         }
 
         reader.EndStep();
 
         bpWriter.BeginStep();
+        if (!rank)
+        {
+            std::cout << "Laplace: output step: " << step << endl;
+        }
+
         if (step == 0)
         {
             bpWriter.Put(deltaTOut, deltaT);   // something wrong
@@ -384,8 +391,8 @@ std:
         double stop = MPI_Wtime();
         double mpitime = stop - start;
 
-        if (rank == 0)
-            cout << "elapsed time = " << mpitime << " step: " << step << endl;
+        if (!rank)
+            cout << "Laplace: elapsed time = " << mpitime << " step: " << step << endl;
 
         step++;
     }

@@ -40,12 +40,12 @@ int main(int argc, char **argv)
     std::string inputFname(argv[1]), outputFname(argv[2]);
 
     if (rank == 0)
-        std::cerr << "Reading from: " << inputFname << std::endl;
+        std::cerr << "Copier: Reading from: " << inputFname << std::endl;
 
     auto inIO = adios.DeclareIO("WriteIO");
     auto reader = inIO.Open(inputFname, adios2::Mode::Read);
 
-    auto outIO = adios.DeclareIO("Output");
+    auto outIO = adios.DeclareIO("CopierOutput");
     auto writer = outIO.Open(outputFname, adios2::Mode::Write);
 
     int step = 0;
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
             break;
 
         auto variables = inIO.AvailableVariables();
-        std::cout << "Reading Step= " << step << std::endl;
+        std::cout << "Copier: Reading Step= " << step << std::endl;
         for (const auto &vi : variables)
         {
             if (vi.first == "step" || vi.first == "MaxStep")
@@ -109,11 +109,11 @@ int main(int argc, char **argv)
         reader.EndStep();
 
         // Write data.
-        std::cout << "Writing Step= " << step << std::endl;
+        std::cout << "Copier: Writing Step= " << step << std::endl;
         status = writer.BeginStep();
         if (status != adios2::StepStatus::OK)
         {
-            std::cerr << "Failure on writer.BeginStep()" << std::endl;
+            std::cerr << "Copier: Failure on writer.BeginStep()" << std::endl;
             break;
         }
 
