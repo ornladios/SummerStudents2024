@@ -39,7 +39,7 @@ def read_data(varname, fr, start_coord, size_dims):
 
 # Command-line arguments
 if len(sys.argv) < 5:
-    print("Usage: python3 slice2d.py BPfile  Variable  slice-index  x|y|z")
+    print("Usage: python3 slice.py BPfile  Variable  slice-index  x|y|z")
     sys.exit(1)
 
 fname = sys.argv[1]
