@@ -46,6 +46,9 @@ int main(int argc, char **argv)
     int MaxStep = 0;
 
     std::vector<double> time_deriv;
+    adios2::Variable<double> xOut;
+    adios2::Variable<double> yOut;
+    adios2::Variable<double> zOut;
     std::size_t dataSz = 0;
 
     adios2::Variable<double> dFdtOut;
@@ -68,7 +71,10 @@ int main(int argc, char **argv)
         }
 
         auto var = inIO.InquireVariable<double>(varIn);
-        // auto shape = var.Shape();
+
+        auto varX = inIO.InquireVariable<double>("x");
+        auto varY = inIO.InquireVariable<double>("y");
+        auto varZ = inIO.InquireVariable<double>("z");
 
         if (step == 0)
         {
@@ -89,15 +95,35 @@ int main(int argc, char **argv)
         }
 
         auto shape = var.Shape();
-        size_t leny = shape[0];
-        size_t lenz = shape[1];
-        size_t lenx = shape[2];
+        size_t lenx = shape[0];
+        size_t leny = shape[1];
+        size_t lenz = shape[2];
+
+        auto shapeX = varX.Shape();
+        auto shapeY = varY.Shape();
+        auto shapeZ = varZ.Shape();
+
+        std::vector<double> arrX(lenx, 0.0);
+        std::vector<double> arrY(leny, 0.0);
+        std::vector<double> arrZ(lenz, 0.0);
+
+        varX.SetSelection({{0}, {lenx}});
+        reader.Get<double>(varX, arrX.data(), adios2::Mode::Sync);
+
+        varY.SetSelection({{0}, {leny}});
+        reader.Get<double>(varY, arrY.data(), adios2::Mode::Sync);
+
+        varZ.SetSelection({{0}, {lenz}});
+        reader.Get<double>(varZ, arrZ.data(), adios2::Mode::Sync);
         // getting the global size
         dataSz = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<std::size_t>());
         if (step == 0)
         {
             dFdtOut = bpIO.DefineVariable<double>(
-                "time_derivative", {leny, lenx, lenz}, {0, 0, 0}, {leny, lenx, lenz}, adios2::ConstantDims);
+                "time_derivative", {lenx, leny, lenz}, {0, 0, 0}, {lenx, leny, lenz}, adios2::ConstantDims);
+            xOut = bpIO.DefineVariable<double>("x", {lenx}, {0}, {lenx}, adios2::ConstantDims);
+            yOut = bpIO.DefineVariable<double>("y", {leny}, {0}, {leny}, adios2::ConstantDims); // weird former changing size
+            zOut = bpIO.DefineVariable<double>("z", {lenz}, {0}, {lenz}, adios2::ConstantDims);
         }
 
         Fp.resize(dataSz, 0.0);
@@ -125,6 +151,9 @@ int main(int argc, char **argv)
         {
             time_deriv.resize(dataSz, 0.0);
             bpWriter.BeginStep();
+            bpWriter.Put(xOut, arrX.data());
+            bpWriter.Put(yOut, arrY.data());
+            bpWriter.Put(zOut, arrZ.data());
             bpWriter.Put(dFdtOut, time_deriv.data());
             bpWriter.EndStep();
         }
