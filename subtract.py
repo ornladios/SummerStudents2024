@@ -1,7 +1,9 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
-from adios2 import Adios, FileReader, Stream
+from adios2 import Adios, Stream, bindings
+
+
 
 if len(sys.argv) < 6:
     print(f"Usage: {sys.argv[0]} bpfile1 var1 bpfile2 var2 output_file")
@@ -13,51 +15,52 @@ fname2 = sys.argv[3]
 var2 = sys.argv[4]
 output_file = sys.argv[5]
 
-print(f"Reading data from the first file: {fname1}")
-data1 = []
-with Stream(fname1, "r") as f:
-    for _ in f.steps():
-        data1.append(f.read(var1))
-print(f"Finished reading data from the first file: {fname1}")
-
-print(f"Reading data from the second file: {fname2}")
-data2 = []
-with Stream(fname2, "r") as f:
-    for _ in f.steps():
-        data2.append(f.read(var2))
-print(f"Finished reading data from the second file: {fname2}")
-
-print("Converting lists to numpy arrays")
-data1 = np.concatenate(data1)
-data2 = np.concatenate(data2)
-data1_flat = data1.flatten()
-data2_flat = data2.flatten()
-
-
-# match the sizes
-min_length = min(len(data1_flat), len(data2_flat))
-data1_flat = data1_flat[:min_length]
-data2_flat = data2_flat[:min_length]
-
-diff = data1_flat - data2_flat
-print("Finished converting lists to numpy arrays")
-
-print(f"Writing differences to the output file: {output_file}")
+f1 = Stream(fname1, "r")
+f2 = Stream(fname2, "r")
 adios = Adios("adios2.xml")
 ioOut = adios.declare_io("uncompressed error")
 fout = Stream(ioOut, output_file, "w")
 
-with Stream(output_file, "w") as s:
+step = 0
+while True:
+    print(f"Step {step}")
+    status = f1.begin_step()
+    if status != bindings.StepStatus.OK:
+        print(f"No more steps or error reading first stream: {fname1}")
+        break
+    v1 = f1.inquire_variable(var1)
+    shape1 = v1.shape()
+    data1 = f1.read(v1)
+    step1 = f1.current_step()
+    print(f"    Data from stream 1, step = {step1} shape = {shape1}")
+    f1.end_step()
+
+    status = f2.begin_step()
+    if status != bindings.StepStatus.OK:
+        print(f"No more steps or error reading second stream: {fname2}")
+        break
+    v2 = f2.inquire_variable(var2)
+    shape2 = v2.shape()
+    data2 = f2.read(v2)
+    step2 = f2.current_step()
+    print(f"    Data from stream 2, step = {step2} shape = {shape2}")
+    f2.end_step()
+
+    if shape1 != shape2:
+        print(f"The shape of the two variables differ! {shape1}  and  {shape2}")
+        break
+
+    diff = data1 - data2
+
     fout.begin_step()
-    fout.write("diff", diff, [len(diff)], [0], [len(diff)])
+    start = np.zeros(3, dtype=np.int64)
+    fout.write("diff", diff, shape1, start, shape1)
     fout.end_step()
 
+print("Finished")
+f1.close()
+f2.close()
 fout.close()
-print(f"Finished writing differences to the output file: {output_file}")
-
-# Optionally, you can print out the differences or create a plot
-print("Differences:")
-print(diff)
 
 # # If you want to create a plot
 # plt.hist(diff, bins=50, alpha=0.5, label='Difference')
