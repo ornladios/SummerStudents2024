@@ -1,81 +1,55 @@
-/*
- * Notes:
- *
- * In this code, slices in a 3D grid, is similar to a loaf of bread position vertically in front of
- * you, and you are cutting horizontally to create slices (should result in normal bread slices).
- *
- * The slice closest to you will have an index of 0.
- *
- * The width of the slice is the x-axis, the height of the slice is the y-axis, and the depth of the
- * slice is the z-axis.
- *
- *
- * Here's a 2d visualization (I tried my best):
 
- *  The coordinate system is a bit weird in this format its (z, x, y) instead of (x, y, z).
-*/
-
-#include <adios2.h>
 #include <ios>       //std::ios_base::failure
 #include <iostream>  //std::cout
-#include <math.h>    // This allows me to use cosine
 #include <stdexcept> //std::invalid_argument std::exception
-#include <stdio.h>   // This allows me to use printf
 #include <vector>
+#include <adios2.h>
+#include <stdio.h>
+#include <math.h>
 #if ADIOS2_USE_MPI
-
 #include <mpi.h>
-
 #endif
+#include <mpi.h>
 #define PI 3.141592653589793
 using namespace std;
-
-void genCoords(int rank, int size, double start_x, double end_x, std::vector<double> &xvector,
-               std::vector<double> &yvector, std::vector<double> &zvector, int start_z, int len_z)
+// when the input number get larger Laplace is wrong
+void gencore(int rank, double h, size_t start_y, std::vector<double> &x, std::vector<double> &z, std::vector<double> &y)
 {
-    if (start_x >= end_x)
+
+    for (int i = 0; i < x.size(); i++)
     {
-        throw std::invalid_argument("start_x must be less than end_x");
+        x[i] = (i * h);
     }
-    // CHNAGE ALL TO BE THE SAME STEP SIZE H
-    // IF THIS ARE DIFFERENT SIZES THEN I HAVE TO CHANGE
-    // z-axis (depth) grows as processor increases -> we need to scale zvector by rank
-    double delta_z = (end_x - start_x) / (len_z - 1);
-    for (int i = 0; i < zvector.size(); i++)
-        zvector[i] = (start_z + i) * delta_z;
+    for (int k = 0; k < z.size(); k++)
+    {
+        z[k] = (k * h);
+    }
 
-    // doesnt grow as process size increases
-    double delta_y = (end_x - start_x) / (yvector.size() - 1);
-    for (int i = 0; i < yvector.size(); i++)
-        yvector[i] = i * delta_y;
+    for (int j = 0; j < y.size(); j++)
+    {
 
-    // doesnt grow as process size increases
-    double delta_x = (end_x - start_x) / (xvector.size() - 1);
-    for (int i = 0; i < xvector.size(); i++)
-        xvector[i] = i * delta_x;
+        y[j] = ((start_y + j) * h);
+    }
 }
 
-void calcF(int num, int rank, double t, std::vector<double> &x, std::vector<double> &z,
-           std::vector<double> &y, std::vector<double> &F)
+void evalF(int num, int rank, double t, std::vector<double> &x, std::vector<double> &z, std::vector<double> &y, std::vector<double> &F)
 {
     double theta = fmod(t, 2.0 * PI);
     double phi = fmod(t / 2.0, 2.0 * PI); // for nums
-    double x0 = sin(phi) + 3;
-    double y0 = sin(phi) + 3;
+    double x0 = sin(phi / 4.0) + 3.0;
+    double y0 = sin(phi / 4.0) + 3.0;
     double z0 = PI;
-    double spin = -1;
-    double x1 = spin * sin(4 * phi) + x0;
-    double y1 = spin * cos(4 * phi) + y0;
+    double spin = -2.0;
+    double x1 = spin * sin(phi) + x0;
+    double y1 = spin * cos(phi) + y0;
     double z1 = PI;
 
-    for (int k = 0; k < z.size(); k++)
+    for (int j = 0; j < y.size(); j++) //  j= row
     {
-        for (int i = 0; i < x.size(); i++) // i =col
+        for (int k = 0; k < z.size(); k++)
         {
-
-            for (int j = 0; j < y.size(); j++) //  j= row
+            for (int i = 0; i < x.size(); i++) // i =col
             {
-
                 int L = i + x.size() * k + j * x.size() * z.size();
                 if (num == 1) // boring
                 {
@@ -87,157 +61,270 @@ void calcF(int num, int rank, double t, std::vector<double> &x, std::vector<doub
                 }
                 else if (num == 3) // intresting
                 {
-                    F[L] = 1.0 / (sqrt(pow(x[i] - x0, 2) + pow(y[j] - y0, 2) + pow(z[k] - z0, 2))) +
-                           1.0 / (sqrt(pow(x[i] - x1, 2) + pow(y[j] - y1, 2) + pow(z[k] - z1, 2)));
+                    F[L] = 1.0 / (sqrt(pow(x[i] - x0, 2) + pow(y[j] - y0, 2) + pow(z[k] - z0, 2))) + 1.0 / (sqrt(pow(x[i] - x1, 2) + pow(y[j] - y1, 2) + pow(z[k] - z1, 2)));
                 }
                 else // WOWERS
                 {
-                    F[L] = 1.5 / (pow((x[i] - x0) * cos(theta) - (y[j] - y0) * sin(theta), 2) +
-                                  4 * pow((x[i] - x0) * sin(theta) + (y[j] - y0) * cos(theta), 2) +
-                                  pow(z[k] - z0, 2)) +
-                           0.5 / (pow((x[i] - x1) * cos(theta) - (y[j] - y1) * sin(theta), 2) +
-                                  4 * pow((x[i] - x1) * sin(theta) + (y[j] - y1) * cos(theta), 2) +
-                                  pow(z[k] - z1, 2));
+                    F[L] = 1.5 / (pow((x[i] - x0) * cos(theta) - (y[j] - y0) * sin(theta), 2) + 4 * pow((x[i] - x0) * sin(theta) + (y[j] - y0) * cos(theta), 2) + pow(z[k] - z0, 2)) + 0.5 / (pow((x[i] - x1) * cos(theta) - (y[j] - y1) * sin(theta), 2) + 4 * pow((x[i] - x1) * sin(theta) + (y[j] - y1) * cos(theta), 2) + pow(z[k] - z1, 2));
                 }
             }
         }
     }
 }
+
+void calcLapace(int rank, int size, int nx, int nz, int ny, double h, std::vector<double> &F, std::vector<double> &laplace)
+{ // ALWAYS MAKE SURE TO HAVE A BUFFER AND MPI BLOCK!!!!!!!!!
+    MPI_Request request;
+    MPI_Status status;
+    MPI_Request req_send_forward;
+    MPI_Request req_send_backward;
+    std::vector<double> forward_neighbor(nx * nz);
+    std::vector<double> backward_neighbor(nx * nz);
+    forward_neighbor.resize(nx * nz, 0);
+    backward_neighbor.resize(nx * nz, 0);
+    std::vector<double> sending_bufferF;
+    std::vector<double> sending_bufferB;
+    // ny = rows
+    // nx = cols
+    // nz = width
+
+    for (int k = 0; k < nz; k++)
+    {
+        for (int i = 0; i < nx; i++)
+        {
+            int j = ny - 1;
+            int L = i + nx * k + j * nx * nz; // global movemnent in cube
+            int l = i + nx * k;               // local movement in plane
+            forward_neighbor[l] = F[L];
+        }
+    }
+    for (int k = 0; k < nz; k++)
+    {
+        for (int i = 0; i < nx; i++)
+        {
+            int j = 0;
+            int L = i + nx * k + j * nx * nz; // global movemnent in cube
+            int l = i + nx * k;               // local movement in plane
+            backward_neighbor[l] = F[L];
+        }
+    }
+    sending_bufferF = forward_neighbor;
+    sending_bufferB = backward_neighbor;
+    if (size > 0)
+    {
+        if (rank == 0)
+        {
+
+            MPI_Isend(sending_bufferF.data(), nx * nz, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &req_send_forward);
+            MPI_Recv(forward_neighbor.data(), nx * nz, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &status);
+        }
+        else if (rank == size - 1)
+        {
+            sending_bufferB = backward_neighbor;
+            MPI_Isend(sending_bufferB.data(), nx * nz, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &req_send_backward);
+            MPI_Recv(backward_neighbor.data(), nx * nz, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &status);
+        }
+        else
+        {
+            MPI_Isend(sending_bufferB.data(), nz * nx, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &req_send_backward);
+            MPI_Isend(sending_bufferF.data(), nx * nz, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &req_send_forward);
+            MPI_Recv(backward_neighbor.data(), nx * nz, MPI_DOUBLE, rank - 1, 0, MPI_COMM_WORLD, &status);
+            MPI_Recv(forward_neighbor.data(), nx * nz, MPI_DOUBLE, rank + 1, 0, MPI_COMM_WORLD, &status);
+        }
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    // calculates the laplace equation in the interior FOR ALL OF THEM!!!!!!!!
+    for (int j = 1; j < ny - 1; j++) // ny = row index =j
+    {
+        for (int k = 1; k < nz - 1; k++) // nz = width =k
+        {
+            for (int i = 1; i < nx - 1; i++) // nx = col =i
+            {
+                int L = i + nx * k + j * nx * nz;
+                int ljp1 = i + nx * k + (j + 1) * nx * nz;
+                int ljm1 = i + nx * k + (j - 1) * nx * nz;
+                int lip1 = (i + 1) + nx * k + j * nx * nz;
+                int lim1 = (i - 1) + nx * k + j * nx * nz;
+                int lkp1 = i + nx * (k + 1) + j * nx * nz;
+                int lkm1 = i + nx * (k - 1) + j * nx * nz;
+                laplace[L] = (F[lip1] + F[lim1] + F[ljp1] + F[ljm1] + F[lkp1] + F[lkm1] - 6 * F[L]) / (h * h);
+            }
+        }
+    }
+    if (rank == 0)
+    {
+
+        for (int k = 1; k < nz - 1; k++)
+        {
+            for (int i = 1; i < nx - 1; i++)
+            {
+                int j = ny - 1; // row index
+                int l = i + nx * k;
+                int L = i + nx * k + j * nx * nz;          // cols *row_index + col = location
+                int ljp1 = i + nx * k + (j + 1) * nx * nz; // row + 1
+                int ljm1 = i + nx * k + (j - 1) * nx * nz; // row - 1
+                int lip1 = (i + 1) + nx * k + j * nx * nz; // column + 1
+                int lim1 = (i - 1) + nx * k + j * nx * nz; // column - 1
+                int lkp1 = i + nx * (k + 1) + j * nx * nz;
+                int lkm1 = i + nx * (k - 1) + j * nx * nz;
+
+                laplace[L] = (F[lip1] + F[lim1] + forward_neighbor[l] + F[ljm1] + F[lkp1] + F[lkm1] - 6 * F[L]) / (h * h);
+            }
+        }
+    }
+    else if (rank == size - 1) // last proc
+    {
+
+        for (int k = 1; k < nz - 1; k++)
+        {
+            for (int i = 1; i < nx - 1; i++)
+            {
+                int j = 0; // row index
+                int l = i + nx * k;
+                int L = i + nx * k + j * nx * nz;          // cols *row_index + col = location
+                int ljp1 = i + nx * k + (j + 1) * nx * nz; // row + 1
+                int ljm1 = i + nx * k + (j - 1) * nx * nz; // row - 1
+                int lip1 = (i + 1) + nx * k + j * nx * nz; // column + 1
+                int lim1 = (i - 1) + nx * k + j * nx * nz; // column - 1
+                int lkp1 = i + nx * (k + 1) + j * nx * nz;
+                int lkm1 = i + nx * (k - 1) + j * nx * nz;
+
+                laplace[L] = (F[lip1] + F[lim1] + F[ljp1] + backward_neighbor[l] + F[lkp1] + F[lkm1] - 6 * F[L]) / (h * h);
+            }
+        }
+    }
+    else
+    {
+        for (int k = 1; k < nz - 1; k++)
+        {
+            for (int i = 1; i < nx - 1; i++)
+            {
+                int j = 0; // row index
+                int l = i + nx * k;
+                int L = i + nx * k + j * nx * nz;          // cols *row_index + col = location
+                int ljp1 = i + nx * k + (j + 1) * nx * nz; // row + 1
+                int ljm1 = i + nx * k + (j - 1) * nx * nz; // row - 1
+                int lip1 = (i + 1) + nx * k + j * nx * nz; // column + 1
+                int lim1 = (i - 1) + nx * k + j * nx * nz; // column - 1
+                int lkp1 = i + nx * (k + 1) + j * nx * nz;
+                int lkm1 = i + nx * (k - 1) + j * nx * nz;
+
+                laplace[L] = (F[lip1] + F[lim1] + F[ljp1] + backward_neighbor[l] + F[lkp1] + F[lkm1] - 6 * F[L]) / (h * h);
+            }
+        }
+
+        for (int k = 1; k < nz - 1; k++)
+        {
+            for (int i = 1; i < nx - 1; i++)
+            {
+                int j = ny - 1; // row index
+                int l = i + nx * k;
+                int L = i + nx * k + j * nx * nz;          // cols *row_index + col = location
+                int ljp1 = i + nx * k + (j + 1) * nx * nz; // row + 1
+                int ljm1 = i + nx * k + (j - 1) * nx * nz; // row - 1
+                int lip1 = (i + 1) + nx * k + j * nx * nz; // column + 1
+                int lim1 = (i - 1) + nx * k + j * nx * nz; // column - 1
+                int lkp1 = i + nx * (k + 1) + j * nx * nz;
+                int lkm1 = i + nx * (k - 1) + j * nx * nz;
+
+                laplace[L] = (F[lip1] + F[lim1] + forward_neighbor[l] + F[ljm1] + F[lkp1] + F[lkm1] - 6 * F[L]) / (h * h);
+            }
+        }
+    }
+}
+
 int main(int argc, char *argv[])
+
 {
     int rank, size;
 #if ADIOS2_USE_MPI
+    // std::cout << "Enter file name, y size, z size, x size, time steps, function number 1-4" << endl;
     int provided;
+    // MPI_THREAD_MULTIPLE is only required if you enable the SST MPI_DP
+
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+    // rank is giving a number to each proccess
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    //  the size of something
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 #else
+    // std::cout << "Enter file name, y size, z size, x size, time steps, function number 1-4" << endl;
     rank = 0;
     size = 1;
-
 #endif
 
 #if ADIOS2_USE_MPI
-    adios2::ADIOS adios("./adios2.xml", MPI_COMM_WORLD);
+    adios2::ADIOS adios("adios2.xml", MPI_COMM_WORLD);
 #else
-    adios2::ADIOS adios("./adios2.xml");
+    adios2::ADIOS adios("adios2.xml");
 #endif
-    // Making sure our user passed in the correct number of arguments
-    // We need 6 arguments: filename, length_z, length_x, length_y, tmax
-    // We check for 7 because argv[0] is always the name of the program
+
     if (argc < 7)
     {
-        if (rank == 0)
-        {
-            // Only rank 0 prints the error message to avoid duplication
-            fprintf(stderr, "Usage: %s <filename> <length_z> <length_x> <length_y> <tmax> <num>\n",
-                    argv[0]);
-        }
-#if ADIOS2_USE_MPI
-        MPI_Abort(MPI_COMM_WORLD, 1); // Abort the program with a non-zero exit code
-#endif
-        return -1;
+        cout << "Minimum 6 arguments required!!!!" << std::endl;
+        cout << "ethan <filename> <global_ny> <global_nz> <global_nx> <steps> <which equation: 1=x^2+y^2+z^2" << endl;
+        return 1;
     }
-
-    // Parsing the cmdline arguments into variables
     std::string filename;
-    filename = argv[1]; // name of the .bp file output
-    // CHNAGE ENTER IN X,Y,Z
-    size_t len_z = atoi(argv[2]); // global length
-    size_t len_x = atoi(argv[3]); // global length
-    size_t len_y = atoi(argv[4]); // global length
-    size_t tmax = atoi(argv[5]);
-    if (!(len_z == len_x && len_z == len_y && len_x == len_y))
-    {
-        if (rank == 0)
-        {
-            // Only rank 0 prints the error message to avoid duplication
-            fprintf(stderr, "Error: len_z, len_x, and len_y must be equal to each other.\n");
-        }
-#if ADIOS2_USE_MPI
-        MPI_Abort(MPI_COMM_WORLD, 1); // Abort the program with a non-zero exit code
-#endif
-        return -1;
-    }
+    filename = argv[1];
+    size_t leny = atoi(argv[2]);
+    size_t lenz = atoi(argv[3]);
+    size_t lenx = atoi(argv[4]);
+    size_t nsteps = atoi(argv[5]);
+    int num = atoi(argv[6]);
 
-    int num = atoi(argv[6]); // num is choose function
-
-    // Total number of values in the 2d grid
-    size_t local_len_z = len_z / size;
-    size_t remainder = len_z % size;
-
-    // If the rank is less than the remainder, we need to add one more to the local_len_z, to
-    // handle global length that can't be evenly divided by the number of processes
-    //
-    // Ex. length of 100 among 3 processors
-    // First one will have 34
-    // Second one will have 33
-    // Third one will have 33
-
+    size_t local_len_y = leny / size;
+    size_t remainder = leny % size;
     if (rank < remainder)
     {
-        local_len_z++;
+        local_len_y++;
     }
+    size_t len_global = lenx * leny * lenz;
+    size_t len_local = local_len_y * lenx * lenz;
 
-    size_t len_global = len_x * len_y * len_z;
-    size_t len_local = local_len_z * len_x * len_y;
+    size_t start_y = rank * (leny / size) + (rank < remainder ? rank : remainder);
 
-    // starting z index for this rank
-    size_t start_z = rank * (len_z / size) + (rank < remainder ? rank : remainder);
+    std::vector<double> x, y, z, tarr;
+    x.resize(lenx, 0);
+    z.resize(lenz, 0);
+    y.resize(local_len_y, 0);
 
-    // Instantiate the x and y vectors
-    std::vector<double> x, y, z;
+    double dt = 1.0 / nsteps;
+    double h = 2 * PI / (lenx - 1);
+    std::vector<double> F(len_local);
+    F.resize(len_local, 0.0);
 
-    // Initilize the x, y, and z vectors with their respective lengths
-    x.resize(len_x, 0);
-    y.resize(len_y, 0);
-    z.resize(local_len_z, 0);
+    std::vector<double> laplace(len_local);
+    laplace.resize(len_local, 0.0);
 
-    // Starting and end-point of the x values
-    double start_x = 0.0;
-    double end_x = 2 * PI;
-
-    // Initialize a double vector of size len_global
-    std::vector<double> F(len_local, 0.0); // F is the function we are trying to differentiate
-
-    // Creating the adios2 IO object
     adios2::IO bpIO = adios.DeclareIO("WriteIO");
-
-    // Opening <filename> for writing with adios2 bpIO object
     adios2::Engine bpWriter = bpIO.Open(filename, adios2::Mode::Write);
     adios2::Operator op = adios.DefineOperator("mgard", "mgard");
 
-    // Defining a variable for the x values
-    adios2::Variable<double> xOut =
-        bpIO.DefineVariable<double>("x", {len_x}, {0}, {len_x}, adios2::ConstantDims);
+    adios2::Variable<double> xOut = bpIO.DefineVariable<double>(
+        "x", {lenx}, {0}, {lenx}, adios2::ConstantDims);
+    adios2::Variable<double> zOut = bpIO.DefineVariable<double>(
+        "z", {lenz}, {0}, {lenz}, adios2::ConstantDims);
+    adios2::Variable<double> yOut = bpIO.DefineVariable<double>(
+        "y", {leny}, {start_y}, {local_len_y}, adios2::ConstantDims);
 
-    // Defining a variable for the y values
-    adios2::Variable<double> yOut =
-        bpIO.DefineVariable<double>("y", {len_y}, {0}, {len_y}, adios2::ConstantDims);
+    adios2::Variable<double> fOut = bpIO.DefineVariable<double>(
+        "F", {leny, lenz, lenx}, {start_y, 0, 0}, {local_len_y, lenz, lenx}, adios2::ConstantDims);
+    // SOMETHING THAT USED TO WORK WITH CMAKE??? BUT WORKS WITH BEING UNCOMMENTED BUT THE XML IS NOT? IDK
+    // fOut.AddOperation(op, {{"accuracy", std::to_string(0.001)}});
+    adios2::Variable<double> lOut = bpIO.DefineVariable<double>(
+        "Laplace", {leny, lenz, lenx}, {start_y, 0, 0}, {local_len_y, lenz, lenx}, adios2::ConstantDims);
 
-    // Defining a variable for the z values
-    adios2::Variable<double> zOut =
-        bpIO.DefineVariable<double>("z", {len_z}, {start_z}, {local_len_z}, adios2::ConstantDims);
-
+    // START OF NEW CODE
     adios2::Variable<double> tOut = bpIO.DefineVariable<double>("time");
     adios2::Variable<double> deltaTOut = bpIO.DefineVariable<double>("deltaT");
-    adios2::Variable<double> hOut = bpIO.DefineVariable<double>("h");
-    adios2::Variable<int> tmaxOut = bpIO.DefineVariable<int>("MaxStep");
-    adios2::Variable<int> stepOut = bpIO.DefineVariable<int>("step");
-
-    // Defining a variable for the function values
-    // "F" is going to have a global size of (len_z * size) by len_x by len_z
-    // Each process is gonna start writing at index [rank * len_z][0][0] meaning rank * len_z
-    // slice of the 3d grid Each process is gonna write (len_z, len_x, len_y) values
-    adios2::Variable<double> fOut =
-        bpIO.DefineVariable<double>("F", {len_z, len_x, len_y}, {start_z, 0, 0},
-                                    {local_len_z, len_x, len_y}, adios2::ConstantDims);
-
-    const std::string extent = "0 " + std::to_string(size * z.size() - 1) + " 0 " +
-                               std::to_string(x.size() - 1) + " 0 " + std::to_string(y.size() - 1);
+    adios2::Variable<int> vStep = bpIO.DefineVariable<int>("step");
+    // chnage to this: leny/size *rank?????
+    const std::string extent = "0 " + std::to_string(leny - 1) + " 0 " + std::to_string(lenz - 1) + " 0 " + std::to_string(lenx - 1);
 
     const std::string imageData = R"(
+
 <?xml version="1.0"?>
 
 <VTKFile type="ImageData" version="0.1" byte_order="LittleEndian">
@@ -264,72 +351,54 @@ int main(int argc, char *argv[])
 </VTKFile>)";
 
     bpIO.DefineAttribute<std::string>("vtk.xml", imageData);
+    bpIO.DefineAttribute<std::string>("meow", "meow meow ");
 
-    // Change in value between points in all axis
-    double dt = 1.0 / tmax;
-    double h = (end_x - start_x) / (len_x - 1);
+    // END OF NEW CODE
+    gencore(rank, h, start_y, x, z, y); // gencore fills in the values of the x, z, y array on each rank
 
-    // Generate the x and y coordinates
-    genCoords(rank, size, start_x, end_x, x, y, z, start_z, len_z);
-
-    for (int t = 1; t <= tmax; t++)
+    for (int t = 1; t <= nsteps; t++)
     {
         double time = t * dt;
-        // Calculate the function values
-        calcF(num, rank, t, x, z, y, F);
+        evalF(num, rank, t, x, z, y, F); // evalF fills in the value of the two dimensional array F
 
-#if ADIOS2_USE_MPI
-        double start = MPI_Wtime();
-#endif
-        // Begin the step
-        bpWriter.BeginStep();
-
-        // Put variables
-        if (rank == 0)
+        if (size > 1) // DO NOT RUN THIS WITH ONLY ONE PROC
         {
-            bpWriter.Put(xOut, x.data()); // writing the x values
-            bpWriter.Put(yOut, y.data()); // writing the y values
-            bpWriter.Put(tOut, time);     // writing out the time used to calculate F
-            bpWriter.Put(stepOut, t);
+            calcLapace(rank, size, x.size(), z.size(), y.size(), h, F, laplace); // fills up the Laplace
         }
 
-        bpWriter.Put(zOut, z.data()); // writing the z values
-        bpWriter.Put(fOut, F.data()); // this must be written for each rank
-
+        bpWriter.BeginStep();
+        /** Put variables for buffering, template type is optional */
+        double start = MPI_Wtime();
+        bpWriter.Put(xOut, x.data());
+        bpWriter.Put(zOut, z.data());
+        bpWriter.Put(yOut, y.data());
+        bpWriter.Put(tOut, time);
+        bpWriter.Put(fOut, F.data());
+        bpWriter.Put(lOut, laplace.data());
+        bpWriter.Put(vStep, t);
         if (t == 1)
         {
             bpWriter.Put(deltaTOut, dt);
-            bpWriter.Put(hOut, h);
-            bpWriter.Put(tmaxOut, (int)tmax);
         }
-
-        // End the step
         bpWriter.EndStep();
-
-#if ADIOS2_USE_MPI
-        double end = MPI_Wtime();
+        double stop = MPI_Wtime();
+        double mpitime = stop - start;
         if (rank == 0)
-        {
-            std::cout << "Time Elapsed: " << end - start << " seconds" << std::endl;
-        }
-#endif
+            cout << "elapsed time = " << mpitime << endl;
     }
 
-    // Close the writer
+    /** Create bp file, engine becomes unreachable after this*/
     bpWriter.Close();
 
-    // Print a message to the user, that all processes have finished writing
     if (rank == 0)
+
     {
-        std::cout << "Wrote file " << filename
-                  << " to disk. It can now be read by running "
-                     "`bpls -l "
-                  << filename << "`.\n";
+        std::cout << "Ethan, I wrote file " << filename
+                  << " to disk.\n";
     }
 
 #if ADIOS2_USE_MPI
 
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
 
 #endif
