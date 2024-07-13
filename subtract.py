@@ -54,7 +54,7 @@ while True:
 
     fout.begin_step()
     start = np.zeros(3, dtype=np.int64)
-    fout.write("diff", diff, shape1, start, shape1)
+    fout.write("diff", diff, [len(diff)], [0], [len(diff)])
     fout.end_step()
 
 print("Finished")
