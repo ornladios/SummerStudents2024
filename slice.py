@@ -19,7 +19,6 @@ def plot2d(varname, Z, x_name, x_data, y_name, y_data, output_file='output.png',
     - cmap: str, the colormap to use for the plot (default: 'viridis')
     """
 
-    X, Y = np.meshgrid(x_data, y_data)
     title = f"{x_name}-{y_name} slice of {varname}"
 
     gs = gridspec.GridSpec(1, 1)
@@ -32,7 +31,7 @@ def plot2d(varname, Z, x_name, x_data, y_name, y_data, output_file='output.png',
         Z,
         origin="lower",
         interpolation="quadric",
-        extent=[y_data.min(), y_data.max(), x_data.min(), x_data.max()],
+        extent=[x_data.min(), x_data.max(), y_data.min(), y_data.max()],
         cmap=plt.get_cmap("gist_ncar"),
         vmin=minval, vmax=maxval
     )
@@ -90,7 +89,7 @@ with Stream(io, fname, 'r') as f:
         print(f"Slice {fname}/{varname}: slice2d reads step {step}")
 
         v1 = f.inquire_variable(var1)
-        v2 = f.inquire_variable(var1)
+        v2 = f.inquire_variable(var2)
         vF = f.inquire_variable(varname)
         shape = vF.shape()
         if slice_dim == 'x':
