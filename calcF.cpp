@@ -18,17 +18,17 @@ void gencore(int rank, double h, size_t start_y, std::vector<double> &x, std::ve
 
     for (int i = 0; i < x.size(); i++)
     {
-        x[i] = (i * h);
+        x[i] =  (i * h);
     }
     for (int k = 0; k < z.size(); k++)
     {
-        z[k] = (k * h);
+        z[k] =  (k * h);
     }
 
     for (int j = 0; j < y.size(); j++)
     {
 
-        y[j] = ((start_y + j) * h);
+        y[j] =  ((start_y + j) * h);
     }
 }
 
@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
         "y", {leny}, {start_y}, {local_len_y}, adios2::ConstantDims);
 
     adios2::Variable<double> fOut = bpIO.DefineVariable<double>(
-        "F", {lenx, leny, lenz}, {0, start_y, 0}, {lenx, local_len_y, lenz}, adios2::ConstantDims);
+        "F", {leny, lenz, lenx}, {start_y, 0, 0}, {local_len_y, lenz, lenx}, adios2::ConstantDims);
     // SOMETHING THAT USED TO WORK WITH CMAKE??? BUT WORKS WITH BEING UNCOMMENTED BUT THE XML IS NOT? IDK
     // fOut.AddOperation(op, {{"accuracy", std::to_string(0.001)}});
 
