@@ -5,15 +5,16 @@ from adios2 import Adios, Stream, bindings
 
 
 
-if len(sys.argv) < 6:
+if len(sys.argv) < 7:
     print(f"Usage: {sys.argv[0]} bpfile1 var1 bpfile2 var2 output_file")
     sys.exit(1)
 
 fname1 = sys.argv[1]
 var1 = sys.argv[2]
-fname2 = sys.argv[3]
-var2 = sys.argv[4]
-output_file = sys.argv[5]
+varx = sys.argv[3]
+fname2 = sys.argv[4]
+var2 = sys.argv[5]
+output_file = sys.argv[6]
 
 f1 = Stream(fname1, "r")
 f2 = Stream(fname2, "r")
@@ -29,8 +30,10 @@ while True:
         print(f"No more steps or error reading first stream: {fname1}")
         break
     v1 = f1.inquire_variable(var1)
+    vx = f1.inquire_variable(varx)
     shape1 = v1.shape()
     data1 = f1.read(v1)
+    datax = f1.read(vx)
     step1 = f1.current_step()
     print(f"    Data from stream 1, step = {step1} shape = {shape1}")
     f1.end_step()
@@ -49,12 +52,14 @@ while True:
     if shape1 != shape2:
         print(f"The shape of the two variables differ! {shape1}  and  {shape2}")
         break
-
+    x = datax
     diff = data1 - data2
-
+ 
     fout.begin_step()
     start = np.zeros(3, dtype=np.int64)
-    fout.write("diff", diff, [len(diff)], [0], [len(diff)])
+
+    fout.write("diff", diff, [len(diff),len(diff),len(diff)], [0,0,0], [len(diff),len(diff),len(diff)])
+    fout.write("x", x, [len(x)], [0], [len(x)])
     fout.end_step()
 
 print("Finished")
