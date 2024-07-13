@@ -293,9 +293,9 @@ std:
         // to coordinate system
 
         auto shapeF = varF.Shape();
-        size_t lenx = shapeF[0];
-        size_t leny = shapeF[1]; // y is the size that is changing
-        size_t lenz = shapeF[2];
+        size_t leny = shapeF[0]; // y is the size that is changing
+        size_t lenz = shapeF[1];
+        size_t lenx = shapeF[2];
 
         auto shapeX = varX.Shape();
         auto shapeY = varY.Shape();
@@ -333,8 +333,8 @@ std:
         // Defining the variable lOut if it is the first step
         if (step == 0)
         {
-            lOut = bpIO.DefineVariable<double>("Laplace", {lenx, leny, lenz}, {0, start_y, 0},
-                                               {lenx, local_len_y, lenz}, adios2::ConstantDims);
+            lOut = bpIO.DefineVariable<double>("Laplace", {leny, lenz, lenx}, {start_y, 0, 0}, {local_len_y, lenz, lenx}, adios2::ConstantDims);
+            // lOut = bpIO.DefineVariable<double>("Laplace", {leny, lenz, lenx}, {start_y, 0, 0}, {local_len_y, lenz, lenx}, adios2::ConstantDims);
             StepMaxOut = bpIO.DefineVariable<int>("MaxStep");
             deltaTOut = bpIO.DefineVariable<double>("deltaT");
             xOut = bpIO.DefineVariable<double>("x", {lenx}, {0}, {lenx}, adios2::ConstantDims);
@@ -369,7 +369,6 @@ std:
         bpWriter.BeginStep();
         if (step == 0)
         {
-
             bpWriter.Put(deltaTOut, deltaT);   // something wrong
             bpWriter.Put(StepMaxOut, MaxStep); // something wrong
         }
