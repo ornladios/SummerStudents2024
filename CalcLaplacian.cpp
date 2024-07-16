@@ -340,6 +340,36 @@ std:
             xOut = bpIO.DefineVariable<double>("x", {lenx}, {0}, {lenx}, adios2::ConstantDims);
             yOut = bpIO.DefineVariable<double>("y", {leny}, {0}, {leny}, adios2::ConstantDims); // weird former changing size
             zOut = bpIO.DefineVariable<double>("z", {lenz}, {0}, {lenz}, adios2::ConstantDims);
+
+            const std::string extent = "0 " + std::to_string(leny - 1) + " 0 " + std::to_string(lenz - 1) + " 0 " + std::to_string(lenx - 1);
+
+            const std::string imageData = R"(
+
+<?xml version="1.0"?>
+
+<VTKFile type="ImageData" version="0.1" byte_order="LittleEndian">
+
+<ImageData WholeExtent=")" + extent +
+                                          R"(" Origin="0 0 0" Spacing="1 1 1">
+<Piece Extent=")" + extent +
+                                          R"(">
+<PointData Scalars="F">
+
+<DataArray Name="F" />
+
+<DataArray Name="Laplace" />
+
+<DataArray Name="TIME"> step 
+</DataArray>
+
+</PointData>
+
+</Piece>
+
+</ImageData>
+
+</VTKFile>)";
+            bpIO.DefineAttribute<std::string>("vtk.xml", imageData);
         }
 
         // Creating vectors of size len_local to store the incoming data
