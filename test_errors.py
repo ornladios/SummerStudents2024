@@ -64,8 +64,7 @@ with Stream(fname, 'r') as file:
         print(f"normalized error: {nomralized}")
 
 
-# read Laplace in
-# remove 0's from Laplace
+
 # subtract numeric vals - Laplace read vals
 # L_F - Laplace read in
 
@@ -93,7 +92,7 @@ with Stream(fname, 'r') as file:
                  - xml file to define operator (mgard), error bound  change to 0.0001 or 0.00006
                  - compress L_f, f ??? small size
 2. Python script: file.read adios – mgard.bp, adios will return rct_L, rct_f  30x30x30
-3. comp_err = np.sqrt(np.mean(diff**2)), where diff = rct_L – L_f
+3. comp_err = np.sqrt(np.mean(diff**2)), where diff = rct_L – L_fan
 4. check if comp_err < T_err, or if comp_err/norm < T_err / norm, where norm = L.max()-L.min()
 5. Repeat this for multiple timesteps
 Fun = exp((x**2 + y**2 + z**2) / scalar)
