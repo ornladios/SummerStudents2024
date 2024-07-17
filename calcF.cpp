@@ -43,6 +43,7 @@ void evalF(int num, int rank, double t, std::vector<double> &x, std::vector<doub
     double x1 = spin * sin(phi) + x0;
     double y1 = spin * cos(phi) + y0;
     double z1 = PI;
+    double scalar = 2 * PI * 2 * PI * 2 * PI;
 
     for (int j = 0; j < y.size(); j++) //  j= row
     {
@@ -53,7 +54,7 @@ void evalF(int num, int rank, double t, std::vector<double> &x, std::vector<doub
                 int L = i + x.size() * k + j * x.size() * z.size();
                 if (num == 1) // boring
                 {
-                    F[L] = x[i] * x[i] + y[j] * y[j] + z[k] * z[k];
+                    F[L] = exp((x[i] * x[i] + y[j] * y[j] + z[k] * z[k]) / scalar);
                 }
                 else if (num == 2) // cool
                 {
